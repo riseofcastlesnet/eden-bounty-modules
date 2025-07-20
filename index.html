@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Eden Bounty Planning System v2.0</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiRWRlbiBCb3VudHkgUGxhbm5pbmcgU3lzdGVtIiwic2hvcnRfbmFtZSI6IkVkZW5QbGFubmVyIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzFhMWEyZSIsInRoZW1lX2NvbG9yIjoiIzRmYzNmNyIsInN0YXJ0X3VybCI6Ii8ifQ==">
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <!-- Eden Modules - Replace YOUR-SITE-URL with your actual Wix site URL -->
+    <script src="YOUR-SITE-URL/eden-modules/config.js"></script>
+    <script src="YOUR-SITE-URL/eden-modules/state.js"></script>
+    <script src="YOUR-SITE-URL/eden-modules/utils.js"></script>
+    <script src="YOUR-SITE-URL/eden-modules/data-manager.js"></script>
+    <script src="YOUR-SITE-URL/eden-modules/table-manager.js"></script>
+    <script src="YOUR-SITE-URL/eden-modules/planning-manager.js"></script>
+    <script src="YOUR-SITE-URL/eden-modules/map-manager.js"></script>
+    <script src="YOUR-SITE-URL/eden-modules/chart-manager.js"></script>
+    <script src="YOUR-SITE-URL/eden-modules/simulator.js"></script>
+    <script src="YOUR-SITE-URL/eden-modules/ui-manager.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="YOUR-SITE-URL/eden-modules/styles.css">
+</head>
+<body>
+    <!-- Sync Status Indicator -->
+    <div class="sync-status" id="syncStatus">
+        <span class="connection-indicator"></span>
+        <span>Connected</span>
+    </div>
+
+    <!-- Notifications Container -->
+    <div class="notifications-container" id="notificationsContainer"></div>
+
+    <!-- Search Overlay -->
+    <div class="search-overlay" id="searchOverlay">
+        <div class="search-box">
+            <input type="text" class="search-input" id="globalSearch" placeholder="Search structures, guilds, coordinates...">
+            <div class="search-results" id="searchResults"></div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="header">
+            <span class="version-badge">v2.0</span>
+            <h1>🏰 Eden Bounty Planning System 🏰</h1>
+            <p>Advanced strategic planning for Rise of Castles guilds</p>
+            <div id="countdown" style="margin-top: 10px; font-size: 18px; color: var(--primary-green);"></div>
+        </div>
+
+        <!-- Loading Screen -->
+        <div id="loadingScreen" style="text-align: center; padding: 100px;">
+            <div class="skeleton" style="width: 200px; height: 200px; margin: 0 auto; border-radius: 50%;"></div>
+            <h3 style="margin-top: 20px;">Loading Eden Data...</h3>
+            <p style="color: var(--text-secondary);">Connecting to Google Sheets...</p>
+        </div>
+
+        <!-- Main Content -->
+        <div id="mainContent" class="hidden">
+            <!-- Navigation Tabs -->
+            <div class="nav-tabs">
+                <div class="nav-tab active" data-tab="planning">
+                    📋 Planning
+                    <span class="badge hidden" id="planningBadge">0</span>
+                </div>
+                <div class="nav-tab" data-tab="map">
+                    🗺️ Map View
+                </div>
+                <div class="nav-tab" data-tab="analytics">
+                    📊 Analytics
+                </div>
+                <div class="nav-tab" data-tab="simulator">
+                    🎯 Simulator
+                </div>
+                <div class="nav-tab" data-tab="settings">
+                    ⚙️ Settings
+                </div>
+            </div>
+
+            <!-- Tab Contents -->
+            <div id="tabContents">
+                <!-- Planning Tab -->
+                <div id="planningTab" class="tab-content">
+                    <!-- Eden Configuration -->
+                    <div class="card">
+                        <h2>🎯 Eden Configuration</h2>
+                        <div class="grid-4">
+                            <div class="input-group">
+                                <label for="edenStartDate">Eden Start Date:</label>
+                                <input type="date" id="edenStartDate">
+                            </div>
+                            <div class="input-group">
+                                <label for="userFaction">Your Faction:</label>
+                                <select id="userFaction">
+                                    <option value="North">🔴 North</option>
+                                    <option value="South">🔵 South</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Current Eden Day:</label>
+                                <span id="currentDay" style="font-size: 1.5rem; color: var(--primary-blue);">-</span>
+                            </div>
+                            <div class="input-group">
+                                <label>Next Occupation:</label>
+                                <span id="nextOccupationDay" style="font-size: 1.2rem; color: var(--primary-green);">-</span>
+                            </div>
+                        </div>
+                        <div class="grid-4" style="margin-top: 20px;">
+                            <button class="btn btn-icon" onclick="window.EdenBounty.DataManager.exportToExcel()">
+                                📊 Export Excel
+                            </button>
+                            <button class="btn btn-icon" onclick="document.getElementById('importFile').click()">
+                                📥 Import Data
+                            </button>
+                            <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display: none;">
+                            <button class="btn btn-icon" onclick="window.EdenBounty.DataManager.generateShareLink()">
+                                🔗 Share Link
+                            </button>
+                            <button class="btn btn-danger btn-icon" onclick="window.EdenBounty.DataManager.clearAllData()">
+                                🗑️ Clear All
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Eden Timeline -->
+                    <div class="card">
+                        <h2>📅 Eden Timeline</h2>
+                        <div class="timeline">
+                            <div class="timeline-track" id="timeline"></div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h4>Total Structures</h4>
+                            <div class="stat-value" id="totalStructures">0</div>
+                            <div class="stat-change positive">Available today: <span id="availableToday">0</span></div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Planned Occupations</h4>
+                            <div class="stat-value" id="plannedCount">0</div>
+                            <div class="stat-change">By <span id="guildsCount">0</span> guilds</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Faction Points (Planned)</h4>
+                            <div class="stat-value" id="totalFactionPoints">0</div>
+                            <div class="stat-change" id="factionLead">-</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Chaos Production</h4>
+                            <div class="stat-value" id="chaosProduction">+0</div>
+                            <div class="stat-change">+<span id="chaosPercent">0</span>% bonus</div>
+                        </div>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin: 0;">🔍 Advanced Filters</h2>
+                            <button class="btn btn-secondary btn-small" onclick="window.EdenBounty.TableManager.clearAllFilters()">Clear Filters</button>
+                        </div>
+                        <div class="grid-4">
+                            <div class="input-group">
+                                <label for="filterType">Structure Type:</label>
+                                <select id="filterType">
+                                    <option value="">All Structures</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="filterFaction">Faction:</label>
+                                <select id="filterFaction">
+                                    <option value="">All Factions</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="filterSector">Sector:</label>
+                                <select id="filterSector">
+                                    <option value="">All Sectors</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="filterZone">Zone:</label>
+                                <select id="filterZone">
+                                    <option value="">All Zones</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="filterDay">Opening Day:</label>
+                                <select id="filterDay">
+                                    <option value="">All Days</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="filterStatus">Status:</label>
+                                <select id="filterStatus">
+                                    <option value="">All Status</option>
+                                    <option value="locked">🔒 Locked</option>
+                                    <option value="available">🔓 Available</option>
+                                    <option value="planned">📋 Planned</option>
+                                    <option value="occupation">🎯 Occupation Day</option>
+                                    <option value="conflict">⚠️ Conflict</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="filterPriority">Priority:</label>
+                                <select id="filterPriority">
+                                    <option value="">All Priorities</option>
+                                    <option value="High">🔴 High</option>
+                                    <option value="Medium">🟡 Medium</option>
+                                    <option value="Low">🟢 Low</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="filterFavorites">Show:</label>
+                                <select id="filterFavorites">
+                                    <option value="">All</option>
+                                    <option value="favorites">⭐ Favorites Only</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Table -->
+                    <div class="card">
+                        <div class="table-actions">
+                            <h2>🏰 Occupation Structures</h2>
+                            <div class="btn-group">
+                                <button class="btn btn-small" onclick="window.EdenBounty.TableManager.refreshTable()">🔄 Refresh</button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <div class="table-virtual-scroll" id="tableScroll">
+                                <table id="structureTable">
+                                    <thead>
+                                        <tr>
+                                            <th>⭐</th>
+                                            <th>Structure</th>
+                                            <th>Coordinates</th>
+                                            <th>Faction</th>
+                                            <th>Sector</th>
+                                            <th style="color: white;">📅</th>
+                                            <th>Time</th>
+                                            <th>Guild</th>
+                                            <th>Date/Time</th>
+                                            <th>Banner</th>
+                                            <th>Points</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="structureTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="table-pagination" id="tablePagination"></div>
+                    </div>
+
+                    <!-- Guild Statistics -->
+                    <div id="guildStatsSection" class="hidden">
+                        <div class="card">
+                            <h2>📊 Guild Statistics</h2>
+                            <div id="guildStatsContent"></div>
+                        </div>
+                    </div>
+
+                    <!-- Faction Statistics -->
+                    <div id="factionStatsSection" class="hidden">
+                        <div class="card">
+                            <h2>🏆 Faction Statistics</h2>
+                            <div id="factionStatsContent"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Map Tab -->
+                <div id="mapTab" class="tab-content hidden">
+                    <div class="card">
+                        <h2>🗺️ Strategic Map View</h2>
+                        <div class="grid-3" style="margin-bottom: 20px;">
+                            <div class="input-group">
+                                <label>Filter by Faction:</label>
+                                <select id="mapFactionFilter">
+                                    <option value="">All Factions</option>
+                                    <option value="North">🔴 North</option>
+                                    <option value="South">🔵 South</option>
+                                    <option value="Neutral">⚪ Neutral</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Show:</label>
+                                <select id="mapViewFilter">
+                                    <option value="all">All Structures</option>
+                                    <option value="planned">Planned Only</option>
+                                    <option value="available">Available Today</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Structure Type:</label>
+                                <select id="mapTypeFilter">
+                                    <option value="">All Types</option>
+                                    <option value="Stronghold">🏰 Stronghold</option>
+                                    <option value="Capitol">🏛️ Capitol</option>
+                                    <option value="Town">🏘️ Towns</option>
+                                    <option value="Lobby">⛩️ Lobbies</option>
+                                    <option value="World Center">🌍 World Center</option>
+                                    <option value="Check Point">🚩 Check Points</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="map-container" id="mapContainer">
+                            <div class="map-viewport" id="mapViewport">
+                                <canvas id="mapCanvas"></canvas>
+                                <div class="map-sectors" id="mapSectors"></div>
+                                <div id="mapStructures"></div>
+                            </div>
+                            <div class="map-legend">
+                                <h4>Legend</h4>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background: #f44336;"></div>
+                                    <span>North Faction</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background: #4fc3f7;"></div>
+                                    <span>South Faction</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background: #fff;"></div>
+                                    <span>Neutral</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-color" style="background: transparent; border-color: #66bb6a;"></div>
+                                    <span>Planned</span>
+                                </div>
+                            </div>
+                            <div class="map-controls">
+                                <button onclick="window.EdenBounty.MapManager.mapZoom(1.2)" title="Zoom In">+</button>
+                                <button onclick="window.EdenBounty.MapManager.mapZoom(0.8)" title="Zoom Out">-</button>
+                                <button onclick="window.EdenBounty.MapManager.mapReset()" title="Reset View">⟲</button>
+                                <button onclick="window.EdenBounty.MapManager.mapCenter()" title="Center View">⊙</button>
+                                <button onclick="window.EdenBounty.MapManager.toggleIsometric()" title="Toggle Isometric">◆</button>
+                            </div>
+                            <div class="map-tooltip" id="mapTooltip"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics Tab -->
+                <div id="analyticsTab" class="tab-content hidden">
+                    <div class="charts-grid">
+                        <div class="chart-container">
+                            <h3>📊 Faction Points Distribution</h3>
+                            <canvas id="factionChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>📈 Occupation Timeline</h3>
+                            <canvas id="timelineChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>🏰 Structure Types</h3>
+                            <canvas id="structureChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>⚔️ Guild Performance</h3>
+                            <canvas id="guildChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="margin-top: 20px;">
+                        <h2>📊 Advanced Analytics</h2>
+                        <div class="grid-2">
+                            <div>
+                                <h3>🎯 Occupation Efficiency</h3>
+                                <div id="efficiencyMetrics"></div>
+                            </div>
+                            <div>
+                                <h3>📈 Trend Analysis</h3>
+                                <div id="trendAnalysis"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simulator Tab -->
+                <div id="simulatorTab" class="tab-content hidden">
+                    <div class="card">
+                        <h2>🎯 Battle Simulator & Strategy Optimizer</h2>
+                        <div class="grid-2">
+                            <div>
+                                <h3>Scenario Settings</h3>
+                                <div class="input-group">
+                                    <label>Simulation Type:</label>
+                                    <select id="simType">
+                                        <option value="points">Points Optimization</option>
+                                        <option value="route">Route Planning</option>
+                                        <option value="conflict">Conflict Resolution</option>
+                                        <option value="whatif">What-If Analysis</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Target Week:</label>
+                                    <input type="number" id="simWeek" min="1" max="6" value="1">
+                                </div>
+                                <div class="input-group">
+                                    <label>Available Guilds:</label>
+                                    <input type="number" id="simGuilds" min="1" value="5">
+                                </div>
+                                <button class="btn btn-icon" id="runSimulationBtn">
+                                    🚀 Run Simulation
+                                </button>
+                            </div>
+                            <div>
+                                <h3>Simulation Results</h3>
+                                <div id="simulationResults" class="skeleton" style="min-height: 200px; border-radius: 10px;">
+                                    <p style="padding: 20px; text-align: center; color: var(--text-secondary);">
+                                        Run a simulation to see results...
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h2>🤖 AI Recommendations</h2>
+                        <div id="aiRecommendations">
+                            <div class="skeleton" style="height: 150px; border-radius: 10px; margin-bottom: 10px;"></div>
+                            <div class="skeleton" style="height: 150px; border-radius: 10px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div id="settingsTab" class="tab-content hidden">
+                    <div class="card">
+                        <h2>⚙️ Application Settings</h2>
+                        <div class="grid-2">
+                            <div>
+                                <h3>Display Settings</h3>
+                                <div class="input-group">
+                                    <label>
+                                        <input type="checkbox" id="compactMode"> Compact Mode
+                                    </label>
+                                </div>
+                                <div class="input-group">
+                                    <label>
+                                        <input type="checkbox" id="animationsEnabled" checked> Enable Animations
+                                    </label>
+                                </div>
+                                <div class="input-group">
+                                    <label>
+                                        <input type="checkbox" id="soundEnabled"> Enable Sound Effects
+                                    </label>
+                                </div>
+                                <div class="input-group">
+                                    <label>Items per page:</label>
+                                    <select id="itemsPerPage">
+                                        <option value="20">20</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                        <option value="200">200</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <h3>Notification Settings</h3>
+                                <div class="input-group">
+                                    <label>
+                                        <input type="checkbox" id="notifyOccupation" checked> Occupation Day Reminders
+                                    </label>
+                                </div>
+                                <div class="input-group">
+                                    <label>
+                                        <input type="checkbox" id="notifyConflict" checked> Conflict Alerts
+                                    </label>
+                                </div>
+                                <div class="input-group">
+                                    <label>
+                                        <input type="checkbox" id="notifyStructure" checked> Structure Availability
+                                    </label>
+                                </div>
+                                <div class="input-group">
+                                    <label>Notification Sound:</label>
+                                    <select id="notificationSound">
+                                        <option value="default">Default</option>
+                                        <option value="bell">Bell</option>
+                                        <option value="chime">Chime</option>
+                                        <option value="none">None</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions Bar -->
+    <div class="quick-actions no-print">
+        <div class="quick-action" onclick="window.EdenBounty.UIManager.toggleSearch()">
+            🔍
+            <span class="tooltip">Global Search (Ctrl+F)</span>
+        </div>
+        <div class="quick-action" onclick="window.EdenBounty.UIManager.quickSave()">
+            💾
+            <span class="tooltip">Quick Save (Ctrl+S)</span>
+        </div>
+        <div class="quick-action" onclick="window.EdenBounty.UIManager.toggleCompactMode()">
+            📱
+            <span class="tooltip">Toggle Compact Mode</span>
+        </div>
+        <div class="quick-action" onclick="window.EdenBounty.UIManager.exportImage()">
+            📸
+            <span class="tooltip">Export as Image</span>
+        </div>
+        <div class="quick-action" onclick="window.EdenBounty.UIManager.undoAction()">
+            ↶
+            <span class="tooltip">Undo (Ctrl+Z)</span>
+        </div>
+        <div class="quick-action" onclick="window.EdenBounty.UIManager.redoAction()">
+            ↷
+            <span class="tooltip">Redo (Ctrl+Y)</span>
+        </div>
+        <div class="quick-action" onclick="window.print()">
+            🖨️
+            <span class="tooltip">Print</span>
+        </div>
+    </div>
+
+    <!-- Undo Toast -->
+    <div class="undo-toast" id="undoToast">
+        <span id="undoMessage">Action undone</span>
+        <button class="btn btn-small" onclick="window.EdenBounty.UIManager.redoAction()">Redo</button>
+    </div>
+
+    <!-- Planning Modal -->
+    <div id="planningModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Plan Occupation</h2>
+                <span class="close">&times;</span>
+            </div>
+            <form id="planningForm">
+                <input type="hidden" id="structureIndex">
+                <div class="grid-2">
+                    <div class="input-group">
+                        <label for="guildName">Guild Name: *</label>
+                        <input type="text" id="guildName" required autocomplete="off" list="guildList">
+                        <datalist id="guildList"></datalist>
+                    </div>
+                    <div class="input-group">
+                        <label for="guildFaction">Guild Faction: *</label>
+                        <select id="guildFaction" required>
+                            <option value="North">🔴 North</option>
+                            <option value="South">🔵 South</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="plannedDate">Occupation Date: *</label>
+                        <input type="date" id="plannedDate" required>
+                        <small style="color: var(--warning);">Must be Sun/Tue/Thu</small>
+                    </div>
+                    <div class="input-group">
+                        <label for="plannedTime">Time (Server Reset +): *</label>
+                        <input type="time" id="plannedTime" required value="00:00">
+                    </div>
+                    <div class="input-group">
+                        <label for="bannerPlayer">Banner Player:</label>
+                        <input type="text" id="bannerPlayer" autocomplete="off" list="playerList">
+                        <datalist id="playerList"></datalist>
+                    </div>
+                    <div class="input-group">
+                        <label for="priority">Priority Level:</label>
+                        <select id="priority">
+                            <option value="High">🔴 High Priority</option>
+                            <option value="Medium" selected>🟡 Medium Priority</option>
+                            <option value="Low">🟢 Low Priority</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group" style="margin-top: 15px;">
+                    <label for="notes">Strategic Notes:</label>
+                    <textarea id="notes" rows="3" placeholder="Add strategic notes, rally points, special instructions..."></textarea>
+                </div>
+                <div id="conflictWarning" class="hidden" style="background: rgba(244, 67, 54, 0.1); border: 1px solid var(--primary-red); border-radius: 8px; padding: 10px; margin-top: 15px;">
+                    <strong>⚠️ Conflict Detected!</strong>
+                    <p id="conflictDetails"></p>
+                </div>
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="window.EdenBounty.PlanningManager.closePlanningModal()">Cancel</button>
+                    <button type="button" class="btn btn-danger" onclick="window.EdenBounty.PlanningManager.removePlanning()" id="removePlanningBtn">Remove</button>
+                    <button type="submit" class="btn">Save Planning</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Initialize Application -->
+    <script>
+        // Eden Bounty Planning System - Main Application
+        (async function() {
+            console.log('Eden Bounty Planning System v2.0 - Initializing...');
+            
+            try {
+                // Initialize state
+                const state = window.EdenBounty.getState();
+                
+                // Initialize all modules
+                window.EdenBounty.DataManager.init(state);
+                window.EdenBounty.TableManager.init(state);
+                window.EdenBounty.PlanningManager.init(state);
+                window.EdenBounty.MapManager.init(state);
+                window.EdenBounty.ChartManager.init(state);
+                window.EdenBounty.Simulator.init(state);
+                window.EdenBounty.UIManager.init(state);
+                
+                // Load all data
+                await window.EdenBounty.DataManager.loadAllData();
+                
+                // Initialize table filters
+                window.EdenBounty.TableManager.initializeFilters();
+                
+                // Hide loading screen
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('mainContent').classList.remove('hidden');
+                
+                // Initial render
+                window.EdenBounty.TableManager.renderTable();
+                
+                // Setup file import handler
+                document.getElementById('importFile').addEventListener('change', async (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        try {
+                            await window.EdenBounty.DataManager.importFromFile(file);
+                            window.EdenBounty.UIManager.showNotification('Data imported successfully', 'success');
+                            window.EdenBounty.TableManager.renderTable();
+                        } catch (error) {
+                            window.EdenBounty.UIManager.showNotification('Import failed: ' + error.message, 'error');
+                        }
+                        e.target.value = ''; // Reset input
+                    }
+                });
+                
+                console.log('Application initialized successfully!');
+            } catch (error) {
+                console.error('Failed to initialize application:', error);
+                document.getElementById('loadingScreen').innerHTML = `
+                    <h3 style="color: #f44336;">Error Loading System</h3>
+                    <p>${error.message}</p>
+                    <button class="btn" onclick="location.reload()">Reload Page</button>
+                `;
+            }
+        })();
+    </script>
+</body>
+</html>
